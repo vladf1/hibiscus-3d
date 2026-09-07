@@ -1,0 +1,14 @@
+{
+  "vertices": 333280,
+  "triangles": 623284,
+  "objects": 316,
+  "petals": 5,
+  "anthers": 96,
+  "pollen_grains": 1632,
+  "stigma_pads": 5,
+  "stigma_papillae": 700,
+  "dew_droplets": 180,
+  "unique_petal_materials": 5,
+  "hosted_model_bytes": 13603584,
+  "leaves": 10
+}
