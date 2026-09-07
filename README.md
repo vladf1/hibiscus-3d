@@ -18,7 +18,7 @@ npm run build
 npm run preview
 ```
 
-The production build is written to `dist/`. Three.js and its addons are bundled separately from the viewer code. Model URLs are managed by Vite and work under the GitHub Pages base path.
+The production build is written to `dist/`. The readable viewer source stays in `src/viewer.js`. Production builds minify and embed it into the HTML, saving one JavaScript request. Three.js and its addons remain in a separate preloaded vendor bundle. Model URLs are managed by Vite and work under the GitHub Pages base path.
 
 ## Editing the model
 
