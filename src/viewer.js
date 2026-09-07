@@ -25,13 +25,16 @@ function resize(){const w=host.clientWidth,h=host.clientHeight;renderer.setSize(
 new ResizeObserver(resize).observe(host);resize();
 let bytes;
 async function loadFlower(){
-try{const response=await fetch(new URL('../assets/hibiscus.glb', import.meta.url));if(!response.ok)throw new Error('Model download failed');bytes=new Uint8Array(await response.arrayBuffer());
-new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parse(bytes.buffer,'',g=>{
+try{const response=await fetch($('#model-preload').href, {mode:'cors',credentials:'same-origin'});if(!response.ok)throw new Error('Model download failed');bytes=new Uint8Array(await response.arrayBuffer());
+const g=await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes.buffer,'');
  flower=g.scene;flower.rotation.x=Math.PI/2;scene.add(flower);
  flower.traverse(o=>{if(o.isMesh){meshes.push(o);o.frustumCulled=false;o.receiveShadow=true;o.castShadow=/Petal|leaf|column|throat|sepal/i.test(o.name);for(const m of (Array.isArray(o.material)?o.material:[o.material])){m.side=THREE.DoubleSide;m.envMapIntensity=.65;if(m.name.includes('Scarlet')){m.roughness=.64;m.normalScale.set(.48,.48);m.sheen=0;m.specularIntensity=.4}if(m.name.includes('Water')){m.envMapIntensity=1.2}materials.push(m)}}});
+ // Prepare shaders before the animation loop can render the flower.
+ $('#loading').textContent='Preparing the flower…';
+ await renderer.compileAsync(scene,camera);
+ renderer.render(scene,camera);
  loaded=true;$('#loading').classList.add('loaded');$('#status').textContent='MODEL READY';$('#mesh-count').textContent=`${Math.round(meshes.reduce((a,m)=>a+(m.geometry.index?.count??m.geometry.attributes.position.count)/3,0)/1000)}k triangles`;
  window.hibiscus={scene,camera,renderer,controls,flower,meshes,go,get ready(){return loaded}};
-},e=>{$('#loading').textContent='The model could not load. '+e.message;console.error(e)});
 }catch(e){$('#loading').textContent='Could not open the flower. Please refresh to try again.';console.error(e)}
 }
 loadFlower();
@@ -45,9 +48,9 @@ $('#exposure').oninput=e=>renderer.toneMappingExposure=+e.target.value;
 $('#background').onclick=()=>{document.body.classList.toggle('light');$('#background').setAttribute('aria-pressed',String(document.body.classList.contains('light')))};
 $('#fullscreen').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen?.()};
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),10000)}
-$('#save').onclick=()=>{renderer.render(scene,camera);renderer.domElement.toBlob(b=>download(b,'hibiscus-view.png'))};
+$('#save').onclick=()=>{if(!loaded)return;renderer.render(scene,camera);renderer.domElement.toBlob(b=>download(b,'hibiscus-view.png'))};
 $('#glb').onclick=()=>bytes&&download(new Blob([bytes],{type:'model/gltf-binary'}),'hibiscus.glb');
 $('#details').onclick=()=>{const p=$('#detail-panel');p.hidden=!p.hidden;$('#details').setAttribute('aria-expanded',String(!p.hidden))};
 window.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;if(e.code==='Space'){e.preventDefault();$('#rotate').click()}if(e.key.toLowerCase()==='r')go('portrait');if(e.key==='Escape')$('#detail-panel').hidden=true});
 controls.addEventListener('start',()=>transition=null);
-function frame(now){requestAnimationFrame(frame);if(transition){let t=Math.min((now-transition.time)/850,1);t=t*t*(3-2*t);camera.position.lerpVectors(transition.from,transition.to,t);controls.target.lerpVectors(transition.startTarget,transition.endTarget,t);if(t>=1)transition=null}controls.update();renderer.render(scene,camera)}requestAnimationFrame(frame);
+function frame(now){requestAnimationFrame(frame);if(transition){let t=Math.min((now-transition.time)/850,1);t=t*t*(3-2*t);camera.position.lerpVectors(transition.from,transition.to,t);controls.target.lerpVectors(transition.startTarget,transition.endTarget,t);if(t>=1)transition=null}controls.update();if(loaded)renderer.render(scene,camera)}requestAnimationFrame(frame);
