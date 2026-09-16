@@ -81,7 +81,12 @@ const presets = {
 };
 function go(name, instant = false) {
   const source = presets[name];
-  const factor = name === "macro" ? 1 : Math.max(1, 0.78 / camera.aspect);
+  const responsiveFactor = Math.max(1, 0.78 / camera.aspect);
+  // Preserve the poster's perspective on narrow screens: widen the lens rather
+  // than moving the portrait camera away from the flower.
+  const factor = name === "portrait" ? 1.12 : name === "macro" ? 1 : responsiveFactor;
+  camera.zoom = name === "portrait" ? 1 / responsiveFactor : 1;
+  camera.updateProjectionMatrix();
   const view = source
     ? {
         target: source.target,

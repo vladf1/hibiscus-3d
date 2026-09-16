@@ -20,7 +20,23 @@
 /* Compact the gap above camera views and reclaim the mobile help row. */
 #stage{bottom:98px}
 @media(max-width:700px){.help{display:none}.controls{bottom:calc(12px + env(safe-area-inset-bottom,0px))}#stage{bottom:calc(74px + env(safe-area-inset-bottom,0px))}.stage-meta{bottom:calc(84px + env(safe-area-inset-bottom,0px))}}
-#poster{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}#loading{inset:auto 0 42px;padding:8px;letter-spacing:.5px;text-shadow:0 1px 4px #000}#stage[aria-busy=true] canvas{visibility:hidden}
+/* Match the portrait camera's max(1, .78 / aspect) framing. */
+#poster{position:absolute;left:50%;top:50%;width:min(100vw / .78,100dvh);height:min(100vw / .78,100dvh);transform:translate(-50%,-50%);object-fit:contain;pointer-events:none}#loading{inset:auto 0 42px;padding:8px;letter-spacing:.5px;text-shadow:0 1px 4px #000}#stage[aria-busy=true] canvas{visibility:hidden}
+/* Full-window canvas with readable floating controls. */
+#stage{position:fixed;inset:0}
+.head-right>button,.views{background:var(--panel);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 4px 20px #0003}
+.head-right>button:hover{background:#304a3e}
+.light .head-right>button:hover{background:#e4e8da}
+.help,.stage-meta{bottom:39px;line-height:1.8;pointer-events:none;text-shadow:0 1px 5px #000,0 0 12px #10221b}
+.stage-meta span{margin-top:0;opacity:.8}
+.light .help,.light .stage-meta{text-shadow:0 1px 5px #fff,0 0 12px #f5f1e7}
+#loading{bottom:104px}
+@media(max-width:1000px) and (min-width:701px){.help,.stage-meta{font-size:11px}.stage-meta span{font-size:11px}.help{left:20px}.stage-meta{right:20px}}
+@media(max-width:700px){
+  .stage-meta{right:16px;bottom:calc(80px + env(safe-area-inset-bottom,0px));font-size:11px}
+  .stage-meta span{display:block;font-size:11px}
+  #loading{bottom:calc(128px + env(safe-area-inset-bottom,0px))}
+}
 </style></head><body>
 <header><div class="head-right"><span class="status" id="status" hidden>PREPARING MODEL</span><button class="rotate" id="rotate" aria-pressed="false">↻ Auto rotate</button><button class="detail-trigger" id="details" aria-expanded="false" aria-controls="detail-panel">Display settings</button><button class="icon" id="fullscreen" aria-label="Toggle fullscreen" title="Fullscreen">⛶</button></div></header>
 <main id="stage" aria-busy="true"><img id="poster" src="./assets/hibiscus-poster.webp" alt="Scarlet hibiscus flower" fetchpriority="high"><div id="loading" role="status">Loading interactive 3D…</div></main>
