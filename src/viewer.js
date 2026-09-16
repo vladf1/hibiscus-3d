@@ -10,12 +10,13 @@ const host = select("#stage");
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
   alpha: true,
-  preserveDrawingBuffer: true,
 });
 renderer.setPixelRatio(Math.min(devicePixelRatio, innerWidth < 700 ? 1.5 : 2));
 renderer.setClearColor(0, 0);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = false;
+renderer.shadowMap.needsUpdate = true;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.95;
@@ -67,6 +68,8 @@ const meshes = [];
 let flower;
 let transition = null;
 let loaded = false;
+let renderRequested = true;
+controls.addEventListener("change", () => { renderRequested = true; });
 
 // Camera presets and animated transitions.
 const presets = {
@@ -117,6 +120,7 @@ function resize() {
   const w = host.clientWidth,
     h = host.clientHeight;
   renderer.setSize(w, h);
+  renderRequested = true;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   if (!loaded) go("portrait", true);
@@ -143,21 +147,22 @@ async function loadFlower() {
     flower.traverse((object) => {
       if (object.isMesh) {
         meshes.push(object);
-        object.frustumCulled = false;
+        if (object.userData.controlGroup === "foliage") object.visible = select("#foliage").checked;
+        if (object.userData.controlGroup === "dew") object.visible = select("#dew").checked;
         object.receiveShadow = true;
-        object.castShadow = /Petal|leaf|column|throat|sepal/i.test(object.name);
+        object.castShadow = object.userData.shadowCaster === true;
         for (const material of Array.isArray(object.material)
           ? object.material
           : [object.material]) {
-          material.side = THREE.DoubleSide;
           material.envMapIntensity = 0.65;
+          material.wireframe = select("#wire").checked;
           if (material.name.includes("Scarlet")) {
             material.roughness = 0.64;
             material.normalScale.set(0.48, 0.48);
             material.sheen = 0;
             material.specularIntensity = 0.4;
           }
-          if (material.name.includes("Water")) {
+          if (material.name.includes("Water") || material.transmission > 0) {
             material.envMapIntensity = 1.2;
           }
           materials.push(material);
@@ -169,7 +174,11 @@ async function loadFlower() {
     await renderer.compileAsync(scene, camera);
     renderer.render(scene, camera);
     loaded = true;
+    performance.mark("hibiscus-ready");
+    performance.measure("hibiscus-ready", { start: 0, end: "hibiscus-ready" });
     select("#loading").classList.add("loaded");
+    select("#poster").classList.add("loaded");
+    select("#stage").setAttribute("aria-busy", "false");
     select("#status").textContent = "MODEL READY";
     select("#mesh-count").textContent =
       `${Math.round(meshes.reduce((a, m) => a + (m.geometry.index?.count ?? m.geometry.attributes.position.count) / 3, 0) / 1000)}k triangles`;
@@ -205,17 +214,26 @@ select("#rotate").onclick = () => {
 select("#reset").onclick = () => go("portrait");
 select("#foliage").onchange = (e) => {
   meshes
-    .filter((o) => /Leaf|leaf|pedicel|stem|petiole/i.test(o.name))
+    .filter((o) => o.userData.controlGroup === "foliage")
+    .forEach((o) => (o.visible = e.target.checked));
+  renderer.shadowMap.needsUpdate = true;
+  renderRequested = true;
+};
+select("#dew").onchange = (e) => {
+  renderRequested = true;
+  meshes
+    .filter((o) => o.userData.controlGroup === "dew")
     .forEach((o) => (o.visible = e.target.checked));
 };
-select("#dew").onchange = (e) =>
-  meshes
-    .filter((o) => /dew.droplets/i.test(o.name))
-    .forEach((o) => (o.visible = e.target.checked));
-select("#wire").onchange = (e) =>
+select("#wire").onchange = (e) => {
   materials.forEach((m) => (m.wireframe = e.target.checked));
-select("#exposure").oninput = (e) =>
-  (renderer.toneMappingExposure = +e.target.value);
+  renderRequested = true;
+  renderer.shadowMap.needsUpdate = true;
+};
+select("#exposure").oninput = (e) => {
+  renderer.toneMappingExposure = +e.target.value;
+  renderRequested = true;
+};
 select("#background").onclick = () => {
   document.body.classList.toggle("light");
   select("#background").setAttribute(
@@ -236,8 +254,14 @@ function download(blob, name) {
 }
 select("#save").onclick = () => {
   if (!loaded) return;
+  // Copy synchronously before the browser discards the drawing buffer. This
+  // retains the exact screen tone mapping without a permanently preserved buffer.
   renderer.render(scene, camera);
-  renderer.domElement.toBlob((b) => download(b, "hibiscus-view.png"));
+  const canvas = document.createElement("canvas");
+  canvas.width = renderer.domElement.width;
+  canvas.height = renderer.domElement.height;
+  canvas.getContext("2d").drawImage(renderer.domElement, 0, 0);
+  canvas.toBlob(blob => blob && download(blob, "hibiscus-view.png"));
 };
 select("#glb").onclick = () =>
   modelBytes &&
@@ -276,6 +300,9 @@ function frame(now) {
     if (t >= 1) transition = null;
   }
   controls.update();
-  if (loaded) renderer.render(scene, camera);
+  if (loaded && renderRequested) {
+    renderer.render(scene, camera);
+    renderRequested = false;
+  }
 }
 requestAnimationFrame(frame);

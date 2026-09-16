@@ -6,12 +6,19 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "optimize:model": "node scripts/optimize-model.mjs",
+    "check:model": "node scripts/check-model.mjs"
   },
   "dependencies": {
     "three": "0.185.1"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.0",
+    "@gltf-transform/extensions": "^4.5.0",
+    "@gltf-transform/functions": "^4.5.0",
+    "meshoptimizer": "^1.2.0",
+    "sharp": "^0.35.4",
     "vite": "8.1.4"
   }
 }
