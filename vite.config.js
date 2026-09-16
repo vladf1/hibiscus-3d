@@ -1,7 +1,7 @@
 import { posix } from "node:path";
 import { defineConfig } from "vite";
 
-const base = "/hibiscus-3d/";
+const base = process.env.DEPLOY_BASE || "/hibiscus-3d/";
 
 // Run after Vite has minified the entry and generated its HTML script tag.
 function inlineViewer() {

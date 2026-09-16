@@ -32,6 +32,22 @@ See [the working-files guide](project-files/README.md) for model editing and reg
 
 Pushes to `main` build and deploy `dist/` through GitHub Actions to GitHub Pages. The workflow can also be started manually. The Pages project path is `/hibiscus-3d/`.
 
+An independent Cloudflare Pages workflow deploys a root-path copy to
+https://hibiscus-dlv.pages.dev/ and the custom domain https://hibiscus.fridman.me/.
+The original GitHub Pages deployment remains available.
+
+```sh
+npm run build:cloudflare
+wrangler pages deploy dist-cloudflare --project-name hibiscus --branch main
+```
+
+`DEPLOY_BASE` defaults to `/hibiscus-3d/`; the Cloudflare build sets it to `/`
+and writes to `dist-cloudflare/`, preserving `dist/`. Both builds keep Three.js
+in its separate vendor bundle and exclude `project-files/`. Automatic Cloudflare
+deployment requires the repository secret `CLOUDFLARE_API_TOKEN` with Pages:Edit
+access on the deployment account. DNS at Namecheap uses a CNAME record named
+`hibiscus` pointing to `hibiscus-dlv.pages.dev` after adding the custom domain in Pages.
+
 ## Cold-load optimization
 
 Run `npm run optimize:model` after exporting changes to `project-files/hibiscus.glb`,
