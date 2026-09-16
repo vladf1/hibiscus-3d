@@ -56,9 +56,25 @@ function inlineViewer() {
   };
 }
 
+// Match the generated Pages _headers when checking the Cloudflare build locally.
+function previewCompressedModel() {
+  return {
+    name: "preview-compressed-model",
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (/^\/assets\/hibiscus-[a-f0-9]{16}\.glb\.br(?:\?|$)/.test(req.url || "")) {
+          res.setHeader("Content-Type", "model/gltf-binary");
+          res.setHeader("Content-Encoding", "br");
+        }
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base,
-  plugins: [inlineViewer()],
+  plugins: [inlineViewer(), previewCompressedModel()],
   build: {
     minify: true,
     modulePreload: { polyfill: false },

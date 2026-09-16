@@ -48,6 +48,18 @@ deployment requires the repository secret `CLOUDFLARE_API_TOKEN` with Pages:Edit
 access on the deployment account. DNS at Namecheap uses a CNAME record named
 `hibiscus` pointing to `hibiscus-dlv.pages.dev` after adding the custom domain in Pages.
 
+Cloudflare does not automatically compress `model/gltf-binary`. The Cloudflare
+build precompresses the model with Brotli quality 11, gives the encoded bytes a
+content-hashed `.glb.br` URL, and generates a Pages `_headers` rule with
+`Content-Encoding: br` and the original model MIME type. HTTPS browsers decode it
+automatically; the viewer and model quality are unchanged. The ordinary GLB remains
+available at its original URL. GitHub Pages keeps its existing gzip delivery.
+To test the Cloudflare output locally with the same model response headers:
+
+```sh
+DEPLOY_BASE=/ npm run preview -- --outDir dist-cloudflare
+```
+
 ## Cold-load optimization
 
 Run `npm run optimize:model` after exporting changes to `project-files/hibiscus.glb`,
