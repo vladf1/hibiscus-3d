@@ -43,10 +43,18 @@ compatible static meshes, creates material palettes, resizes textures to at most
 1024 pixels, encodes WebP at quality 80, and applies Meshopt compression.
 `TEXTURE_SIZE` and `TEXTURE_QUALITY` explicitly override the texture settings.
 
+Before optimizing, `scripts/surface-details.mjs` corrects two things in the export.
+It moves each of the 180 dew droplets onto the front of its petal, with a flat base
+resting on the petal instead of sinking through it. Droplets that sat on the reverse,
+under an overlapping petal, or on top of another droplet move to the nearest free
+spot. The stem, pedicel, petioles, receptacle, sepals, and epicalyx get UVs and a
+shared tiling epidermis texture (color and normal map), with sheen and lower
+specular for a matte finish. Both passes are deterministic and keep every triangle.
+
 The same run writes the progressive-loading assets. `assets/hibiscus-core.glb` keeps
-all geometry and color textures but replaces the 15 petal and leaf normal maps with
-128-pixel previews (`PREVIEW_SIZE` overrides this). It is 1.22 MB gzipped instead of
-4.56 MB. The viewer reveals the flower from the core model, then streams the
+all geometry and color textures but replaces the 16 petal, leaf, and stem normal maps
+with 128-pixel previews (`PREVIEW_SIZE` overrides this). It is 1.24 MB gzipped instead
+of 4.62 MB. The viewer reveals the flower from the core model, then streams the
 unchanged full-size normal maps from `assets/textures/`, petals first. It decodes them
 asynchronously and uploads within a small per-frame budget. The final render is
 identical to the full model. `npm run check:model` verifies the core model's
