@@ -209,7 +209,10 @@ function streamDetails(downloads) {
       await new Promise((resolve) => uploads.push({ preview, texture, users, resolve }));
     }),
   ).then((results) => {
-    for (const { reason } of results) if (reason) console.warn(reason);
+    const failures = results.filter(({ status }) => status === "rejected");
+    for (const { reason } of failures) console.warn(reason);
+    // Failed textures keep their previews, so the flower is not fully detailed.
+    if (failures.length) return;
     performance.mark("hibiscus-detailed");
     performance.measure("hibiscus-detailed", {
       start: 0,

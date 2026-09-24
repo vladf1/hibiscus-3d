@@ -13,7 +13,8 @@ core model) instead of 4.78 MB.
 | 10 Mbps / 40 ms | 5.45 s | 2.54 s | 53% faster |
 | 1.6 Mbps / 150 ms | 25.41 s | 8.53 s | 66% faster |
 
-On the slow profile, the full-detail textures finish at 25.7 s (`hibiscus-detailed`),
+On the slow profile, the full-detail textures finish at 25.7 s (`hibiscus-detailed`, which
+is recorded only when every texture loads),
 about when the old build first showed anything. After streaming, the frame is
 pixel-identical to the previous build's portrait render.
 
