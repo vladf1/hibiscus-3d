@@ -1,5 +1,33 @@
 # Cold-loading results
 
+## Progressive textures (September 24, 2026)
+
+The viewer now reveals a core model whose 15 petal and leaf normal maps are
+128-pixel previews, then streams the full-size maps (3.37 MB of WebP) after the reveal.
+The build also ships the core model as explicit gzip, decoded with `DecompressionStream`.
+Before the reveal, the viewer downloads 1.44 MB in total (HTML, poster, Three.js,
+core model) instead of 4.78 MB.
+
+| `hibiscus-ready` | Before | After | Change |
+| --- | ---: | ---: | ---: |
+| 10 Mbps / 40 ms | 5.45 s | 2.54 s | 53% faster |
+| 1.6 Mbps / 150 ms | 25.41 s | 8.53 s | 66% faster |
+
+On the slow profile, the full-detail textures finish at 25.7 s (`hibiscus-detailed`, which
+is recorded only when every texture loads),
+about when the old build first showed anything. After streaming, the frame is
+pixel-identical to the previous build's portrait render.
+
+These are single cold runs of the same machine's gzip preview
+(`scripts/benchmark-preview.mjs`), comparing the previous commit's build to this one.
+They used Playwright's headless Chromium with CDP network throttling and SwiftShader
+software WebGL, without CPU throttling and without Lighthouse. So absolute times
+include slow software rendering. Compare the two columns, not these numbers with the
+Lighthouse tables below. With SwiftShader, each streamed texture swap costs a full
+software frame; on a GPU the per-frame upload budget keeps swaps within a few frames.
+
+## Compact model and poster (September 15, 2026)
+
 Measured locally on September 15, 2026, with production Vite builds, gzip responses,
 fresh Lighthouse browser profiles, and real DevTools network throttling. These are
 local comparisons, not measurements of a newly deployed GitHub Pages site.
