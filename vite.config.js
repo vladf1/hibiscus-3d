@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import { gzipSync } from "node:zlib";
 import { defineConfig } from "vite";
 
 const base = process.env.DEPLOY_BASE || "/hibiscus-3d/";
@@ -56,25 +57,42 @@ function inlineViewer() {
   };
 }
 
-// Match the generated Pages _headers when checking the Cloudflare build locally.
-function previewCompressedModel() {
+// GitHub Pages compresses by content type, which may exclude GLB files. Ship the
+// core model as explicit gzip; the viewer inflates it with DecompressionStream.
+function gzipCoreModel() {
   return {
-    name: "preview-compressed-model",
-    configurePreviewServer(server) {
-      server.middlewares.use((req, res, next) => {
-        if (/^\/assets\/hibiscus-[a-f0-9]{16}\.glb\.br(?:\?|$)/.test(req.url || "")) {
-          res.setHeader("Content-Type", "model/gltf-binary");
-          res.setHeader("Content-Encoding", "br");
-        }
-        next();
-      });
+    name: "gzip-core-model",
+    apply: "build",
+    enforce: "post",
+    generateBundle: {
+      order: "post",
+      handler(_options, bundle) {
+        const html = bundle["index.html"];
+        const model = Object.values(bundle).find(
+          (file) =>
+            file.type === "asset" &&
+            /^assets\/hibiscus-core-[\w-]+\.glb$/.test(file.fileName),
+        );
+        if (!html || !model) this.error("Missing viewer HTML or core model.");
+        const href = `href="${base + model.fileName}"`;
+        if (!String(html.source).includes(href))
+          this.error("Could not find the core model preload.");
+        const fileName = `${model.fileName}.gz`;
+        html.source = String(html.source).replace(href, `href="${base + fileName}"`);
+        delete bundle[model.fileName];
+        this.emitFile({
+          type: "asset",
+          fileName,
+          source: gzipSync(model.source, { level: 9 }),
+        });
+      },
     },
   };
 }
 
 export default defineConfig({
   base,
-  plugins: [inlineViewer(), previewCompressedModel()],
+  plugins: [inlineViewer(), gzipCoreModel()],
   build: {
     minify: true,
     modulePreload: { polyfill: false },

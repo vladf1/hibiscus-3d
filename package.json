@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "build:cloudflare": "DEPLOY_BASE=/ vite build --outDir dist-cloudflare && node scripts/compress-cloudflare.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "optimize:model": "node scripts/optimize-model.mjs",
     "check:model": "node scripts/check-model.mjs"

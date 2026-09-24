@@ -18,12 +18,14 @@ npm run build
 npm run preview
 ```
 
-The production build is written to `dist/`. The readable viewer source stays in `src/viewer.js`. Production builds minify and embed it into the HTML, saving one JavaScript request. Three.js and its addons remain in a separate preloaded vendor bundle. Model URLs are managed by Vite and work under the GitHub Pages base path.
+The production build is written to `dist/`. The readable viewer source stays in `src/viewer.js`. Production builds minify and embed it into the HTML, saving one JavaScript request. Three.js and its addons remain in a separate preloaded vendor bundle. Model and texture URLs are managed by Vite and work under the GitHub Pages base path. The build also gzips the core model into `hibiscus-core-*.glb.gz`, so its transfer size does not depend on whether the host compresses GLB files.
 
 ## Editing the model
 
 - `index.html` and `src/viewer.js`: maintained viewer.
-- `assets/hibiscus.glb`: optimized runtime model.
+- `assets/hibiscus-core.glb`: fast-loading runtime model with small normal-map previews.
+- `assets/textures/`: full-resolution normal maps streamed in after the flower appears.
+- `assets/hibiscus.glb`: full-quality optimized model, used by Download GLB and as the fallback.
 - `project-files/`: editable Blender scene, original photographs, textures, generation scripts, uncompressed export, and an offline viewer snapshot.
 
 See [the working-files guide](project-files/README.md) for model editing and regeneration. The working archive is preserved in Git and excluded from the deployed site.
@@ -40,6 +42,16 @@ original, all 623,296 triangles, and separate foliage/dew visibility groups. It 
 compatible static meshes, creates material palettes, resizes textures to at most
 1024 pixels, encodes WebP at quality 80, and applies Meshopt compression.
 `TEXTURE_SIZE` and `TEXTURE_QUALITY` explicitly override the texture settings.
+
+The same run writes the progressive-loading assets. `assets/hibiscus-core.glb` keeps
+all geometry and color textures but replaces the 15 petal and leaf normal maps with
+128-pixel previews (`PREVIEW_SIZE` overrides this). It is 1.22 MB gzipped instead of
+4.56 MB. The viewer reveals the flower from the core model, then streams the
+unchanged full-size normal maps from `assets/textures/`, petals first. It decodes them
+asynchronously and uploads within a small per-frame budget. The final render is
+identical to the full model. `npm run check:model` verifies the core model's
+triangles and bounds, and that every streamed texture matches the full model
+byte-for-byte. Browsers without `DecompressionStream` load `assets/hibiscus.glb` directly.
 
 The HTML loads a small transparent poster before JavaScript/model readiness.
 `assets/hibiscus-poster.webp` is a portrait capture of the model; update it if the

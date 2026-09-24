@@ -3,6 +3,16 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import fullModelUrl from "../assets/hibiscus.glb?url";
+
+// Full-resolution vein normal maps, streamed after the core model.
+const detailTextures = Object.entries(
+  import.meta.glob("../assets/textures/*.webp", {
+    eager: true,
+    query: "?url",
+    import: "default",
+  }),
+).map(([path, url]) => ({ name: path.match(/([^/]+)\.webp$/)[1], url }));
 
 // Renderer, camera, and lighting.
 const select = (selector) => document.querySelector(selector);
@@ -133,19 +143,110 @@ function resize() {
 new ResizeObserver(resize).observe(host);
 resize();
 
+// Builds gzip the core model themselves, so its transfer size does not depend
+// on whether the host compresses GLB files. The dev server sends it plain.
+async function readModel(response) {
+  const bytes = await response.arrayBuffer();
+  const [a, b] = new Uint8Array(bytes, 0, 2);
+  if (a !== 0x1f || b !== 0x8b) return bytes;
+  const stream = new Blob([bytes])
+    .stream()
+    .pipeThrough(new DecompressionStream("gzip"));
+  return new Response(stream).arrayBuffer();
+}
+
+// Download detail textures in two waves so the petals finish first. They are
+// decoded after the reveal and uploaded within a small per-frame budget.
+function downloadDetails() {
+  const fetchBlob = async ({ name, url }) => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Texture download failed: ${name}`);
+    return response.blob();
+  };
+  const downloads = new Map();
+  for (const texture of detailTextures)
+    if (texture.name.startsWith("petal"))
+      downloads.set(texture.name, fetchBlob(texture));
+  const firstWave = Promise.allSettled(downloads.values());
+  for (const texture of detailTextures)
+    if (!downloads.has(texture.name))
+      downloads.set(texture.name, firstWave.then(() => fetchBlob(texture)));
+  // Failures are reported once the textures are applied.
+  for (const blob of downloads.values()) blob.catch(() => {});
+  return downloads;
+}
+const uploads = [];
+async function decodeDetail(preview, blob) {
+  // Match GLTFLoader's decoding, so orientation and color handling are unchanged.
+  if (typeof ImageBitmap !== "undefined" && preview.image instanceof ImageBitmap)
+    return createImageBitmap(await blob, {
+      premultiplyAlpha: "none",
+      colorSpaceConversion: "none",
+    });
+  const image = new Image();
+  image.src = URL.createObjectURL(await blob);
+  try {
+    await image.decode();
+  } finally {
+    URL.revokeObjectURL(image.src);
+  }
+  return image;
+}
+function streamDetails(downloads) {
+  const previews = new Map();
+  for (const material of materials)
+    if (downloads.has(material.normalMap?.name))
+      previews.set(material.normalMap, [
+        ...(previews.get(material.normalMap) ?? []),
+        material,
+      ]);
+  return Promise.allSettled(
+    [...previews].map(async ([preview, users]) => {
+      const image = await decodeDetail(preview, downloads.get(preview.name));
+      const texture = preview.clone();
+      texture.source = new THREE.Source(image);
+      texture.needsUpdate = true;
+      await new Promise((resolve) => uploads.push({ preview, texture, users, resolve }));
+    }),
+  ).then((results) => {
+    for (const { reason } of results) if (reason) console.warn(reason);
+    performance.mark("hibiscus-detailed");
+    performance.measure("hibiscus-detailed", {
+      start: 0,
+      end: "hibiscus-detailed",
+    });
+  });
+}
+function uploadDetails() {
+  // Spend at most a few milliseconds per frame, but always make progress.
+  const start = performance.now();
+  while (uploads.length) {
+    const { preview, texture, users, resolve } = uploads.shift();
+    renderer.initTexture(texture);
+    for (const material of users) material.normalMap = texture;
+    preview.dispose();
+    preview.image.close?.();
+    renderRequested = true;
+    resolve();
+    if (performance.now() - start > 6) break;
+  }
+}
+
 // Reuse the model preload, then prepare the complete flower before revealing it.
-let modelBytes;
 async function loadFlower() {
   try {
-    const response = await fetch(select("#model-preload").href, {
-      mode: "cors",
-      credentials: "same-origin",
-    });
+    // Browsers without DecompressionStream load the full model instead.
+    const progressive = typeof DecompressionStream !== "undefined";
+    const response = await fetch(
+      progressive ? select("#model-preload").href : fullModelUrl,
+      { mode: "cors", credentials: "same-origin" },
+    );
     if (!response.ok) throw new Error("Model download failed");
-    modelBytes = new Uint8Array(await response.arrayBuffer());
+    const modelBuffer = await readModel(response);
+    const downloads = progressive ? downloadDetails() : new Map();
     const gltf = await new GLTFLoader()
       .setMeshoptDecoder(MeshoptDecoder)
-      .parseAsync(modelBytes.buffer, "");
+      .parseAsync(modelBuffer, "");
     flower = gltf.scene;
     flower.rotation.x = Math.PI / 2;
     scene.add(flower);
@@ -187,6 +288,7 @@ async function loadFlower() {
     select("#status").textContent = "MODEL READY";
     select("#mesh-count").textContent =
       `${Math.round(meshes.reduce((a, m) => a + (m.geometry.index?.count ?? m.geometry.attributes.position.count) / 3, 0) / 1000)}k triangles`;
+    streamDetails(downloads);
     window.hibiscus = {
       scene,
       camera,
@@ -268,12 +370,13 @@ select("#save").onclick = () => {
   canvas.getContext("2d").drawImage(renderer.domElement, 0, 0);
   canvas.toBlob(blob => blob && download(blob, "hibiscus-view.png"));
 };
-select("#glb").onclick = () =>
-  modelBytes &&
-  download(
-    new Blob([modelBytes], { type: "model/gltf-binary" }),
-    "hibiscus.glb",
-  );
+select("#glb").onclick = () => {
+  // The full-quality model is only downloaded on request.
+  const a = document.createElement("a");
+  a.href = fullModelUrl;
+  a.download = "hibiscus.glb";
+  a.click();
+};
 select("#details").onclick = () => {
   const p = select("#detail-panel");
   p.hidden = !p.hidden;
@@ -305,6 +408,7 @@ function frame(now) {
     if (t >= 1) transition = null;
   }
   controls.update();
+  if (loaded) uploadDetails();
   if (loaded && renderRequested) {
     renderer.render(scene, camera);
     renderRequested = false;
