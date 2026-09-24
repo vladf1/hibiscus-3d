@@ -74,11 +74,23 @@ function gzipCoreModel() {
             /^assets\/hibiscus-core-[\w-]+\.glb$/.test(file.fileName),
         );
         if (!html || !model) this.error("Missing viewer HTML or core model.");
-        const href = `href="${base + model.fileName}"`;
-        if (!String(html.source).includes(href))
+        const preload = String(html.source).match(/<link id="model-preload"[^>]*>/)?.[0];
+        if (!preload?.includes(`href="${base + model.fileName}"`))
           this.error("Could not find the core model preload.");
         const fileName = `${model.fileName}.gz`;
-        html.source = String(html.source).replace(href, `href="${base + fileName}"`);
+        // Only browsers that can inflate the core model preload it. The others
+        // load the full model instead and would never use this download.
+        const link = JSON.stringify({
+          id: "model-preload",
+          rel: "preload",
+          as: "fetch",
+          crossOrigin: "anonymous",
+          href: base + fileName,
+        });
+        html.source = String(html.source).replace(
+          preload,
+          `<script>if(self.DecompressionStream)document.head.append(Object.assign(document.createElement("link"),${link}))</script>`,
+        );
         delete bundle[model.fileName];
         this.emitFile({
           type: "asset",

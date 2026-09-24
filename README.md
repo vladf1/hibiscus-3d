@@ -18,7 +18,7 @@ npm run build
 npm run preview
 ```
 
-The production build is written to `dist/`. The readable viewer source stays in `src/viewer.js`. Production builds minify and embed it into the HTML, saving one JavaScript request. Three.js and its addons remain in a separate preloaded vendor bundle. Model and texture URLs are managed by Vite and work under the GitHub Pages base path. The build also gzips the core model into `hibiscus-core-*.glb.gz`, so its transfer size does not depend on whether the host compresses GLB files.
+The production build is written to `dist/`. The readable viewer source stays in `src/viewer.js`. Production builds minify and embed it into the HTML, saving one JavaScript request. Three.js and its addons remain in a separate preloaded vendor bundle. Model and texture URLs are managed by Vite and work under the GitHub Pages base path. The build also gzips the core model into `hibiscus-core-*.glb.gz`, so its transfer size does not depend on whether the host compresses GLB files. Only browsers with `DecompressionStream` preload it.
 
 ## Editing the model
 
