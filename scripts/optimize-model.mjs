@@ -4,6 +4,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, flatten, join, listTextureSlots, palette, meshopt, textureCompress } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
+import { seatDew, textureStemsAndCalyx } from './surface-details.mjs';
 
 // Always regenerate from the editable original, never recompress the runtime asset.
 const maxSize = Number(process.env.TEXTURE_SIZE || 1024);
@@ -15,6 +16,9 @@ const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies(
   'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder,
 });
 const document = await io.read('project-files/hibiscus.glb');
+const dew = seatDew(document);
+await textureStemsAndCalyx(document);
+console.log(`Dew: ${dew.droplets} droplets on petal fronts, ${dew.moved} moved clear of other petals.`);
 const group = name => /dew.droplets/i.test(name) ? 'dew' : /Leaf|pedicel|stem|petiole/i.test(name) ? 'foliage' : 'flower';
 const caster = name => /^Petal|serrated blade|throat|sepal/i.test(name);
 for (const node of document.getRoot().listNodes()) {
