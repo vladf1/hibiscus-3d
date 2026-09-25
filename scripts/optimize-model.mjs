@@ -1,17 +1,20 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, flatten, join, listTextureSlots, palette, meshopt, textureCompress } from '@gltf-transform/functions';
-import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
+import { dedup, flatten, join, listTextureSlots, palette, meshopt, textureCompress, weld } from '@gltf-transform/functions';
+import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
+import { simplifyMesh } from './simplify-mesh.mjs';
 import { seatDew, textureStemsAndCalyx } from './surface-details.mjs';
 
 // Always regenerate from the editable original, never recompress the runtime asset.
 const maxSize = Number(process.env.TEXTURE_SIZE || 1024);
 const quality = Number(process.env.TEXTURE_QUALITY || 80);
 const previewSize = Number(process.env.PREVIEW_SIZE || 128);
+const simplifyError = Number(process.env.SIMPLIFY_ERROR ?? 0.003);
+const dewRatio = Number(process.env.DEW_RATIO || 0.5);
 if (process.env.KTX_EXPERIMENT && !process.argv[2]) throw new Error("KTX experiment requires an explicit output path.");
-await Promise.all([MeshoptDecoder.ready, MeshoptEncoder.ready]);
+await Promise.all([MeshoptDecoder.ready, MeshoptEncoder.ready, MeshoptSimplifier.ready]);
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
   'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder,
 });
@@ -25,6 +28,21 @@ for (const node of document.getRoot().listNodes()) {
   if (node.getMesh()) node.setExtras({ ...node.getExtras(), controlGroup: group(node.getName()), shadowCaster: caster(node.getName()) });
 }
 await document.transform(dedup(), palette(), flatten());
+// Simplify each source mesh before joining, until its error (relative to the mesh
+// size) reaches the limit. Dew is one mesh spread over the flower, so a relative
+// limit would flatten each droplet; it keeps a fixed share of its triangles instead.
+if (simplifyError > 0) {
+  await document.transform(weld());
+  const done = new Set();
+  for (const node of document.getRoot().listNodes()) {
+    const mesh = node.getMesh();
+    if (!mesh || done.has(mesh)) continue;
+    done.add(mesh);
+    const options = node.getExtras().controlGroup === 'dew' ? {ratio: dewRatio, error: 1} : {ratio: 0, error: simplifyError};
+    for (const primitive of mesh.listPrimitives())
+      if (!simplifyMesh(document, primitive, options)) console.log(`Not simplified: ${mesh.getName()}`);
+  }
+}
 // Do not merge across visibility or shadow boundaries.
 for (const controlGroup of ['flower', 'foliage', 'dew']) {
   for (const shadowCaster of [false, true]) {

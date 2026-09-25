@@ -38,10 +38,17 @@ Pushes to `main` build and deploy `dist/` through GitHub Actions to GitHub Pages
 
 Run `npm run optimize:model` after exporting changes to `project-files/hibiscus.glb`,
 then `npm run check:model` and `npm run build`. The pipeline preserves the editable
-original, all 623,296 triangles, and separate foliage/dew visibility groups. It joins
-compatible static meshes, creates material palettes, resizes textures to at most
-1024 pixels, encodes WebP at quality 80, and applies Meshopt compression.
-`TEXTURE_SIZE` and `TEXTURE_QUALITY` explicitly override the texture settings.
+original and separate foliage/dew visibility groups. It simplifies each source mesh
+with meshoptimizer (623,296 triangles become about 144,000), joins compatible static
+meshes, creates material palettes, resizes textures to at most 1024 pixels, encodes
+WebP at quality 80, and applies Meshopt compression. `TEXTURE_SIZE` and
+`TEXTURE_QUALITY` explicitly override the texture settings.
+
+Simplification (`scripts/simplify-mesh.mjs`) stops at an error of 0.3% of each mesh's
+size (`SIMPLIFY_ERROR`; `0` keeps every triangle). It weighs normals and UVs, moves
+the remaining vertices to fit the original surface, and preserves the folds of the
+thin double-sided petals. The dew droplets are one mesh spread over the flower, so
+they keep half their triangles instead (`DEW_RATIO`).
 
 Before optimizing, `scripts/surface-details.mjs` corrects two things in the export.
 It moves each of the 180 dew droplets onto the front of its petal, with a flat base
@@ -49,16 +56,16 @@ resting on the petal instead of sinking through it. Droplets that sat on the rev
 under an overlapping petal, or on top of another droplet move to the nearest free
 spot. The stem, pedicel, petioles, receptacle, sepals, and epicalyx get UVs and a
 shared tiling epidermis texture (color and normal map), with sheen and lower
-specular for a matte finish. Both passes are deterministic and keep every triangle.
+specular for a matte finish. Both passes are deterministic and run before simplification.
 
 The same run writes the progressive-loading assets. `assets/hibiscus-core.glb` keeps
 all geometry and color textures but replaces the 16 petal, leaf, and stem normal maps
-with 128-pixel previews (`PREVIEW_SIZE` overrides this). It is 1.24 MB gzipped instead
-of 4.62 MB. The viewer reveals the flower from the core model, then streams the
+with 128-pixel previews (`PREVIEW_SIZE` overrides this). It is 0.63 MB gzipped instead
+of 4.01 MB. The viewer reveals the flower from the core model, then streams the
 unchanged full-size normal maps from `assets/textures/`, petals first. It decodes them
 asynchronously and uploads within a small per-frame budget. The final render is
-identical to the full model. `npm run check:model` verifies the core model's
-triangles and bounds, and that every streamed texture matches the full model
+identical to the full model. `npm run check:model` verifies that both models share
+the simplified geometry and the original bounds, and that every streamed texture matches the full model
 byte-for-byte. Browsers without `DecompressionStream` load `assets/hibiscus.glb` directly.
 
 The HTML loads a small transparent poster before JavaScript/model readiness.

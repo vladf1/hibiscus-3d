@@ -1,5 +1,42 @@
 # Cold-loading results
 
+## Geometry simplification (September 25, 2026)
+
+The optimizer now simplifies each source mesh with meshoptimizer 1.3
+(`simplifyWithUpdate`, weighing normals and UVs, with `PreserveFolds`) until the
+error reaches 0.3% of the mesh's size. Dew droplets keep half their triangles.
+623,296 triangles become 143,690 (flower 88,315, foliage 29,457, dew 25,918).
+
+| Asset, gzip | Before | After | Change |
+| --- | ---: | ---: | ---: |
+| Core model (before reveal) | 1.24 MB | 0.63 MB | 49% smaller |
+| Full model | 4.61 MB | 4.01 MB | 13% smaller |
+
+| `hibiscus-ready` | Before | After | Change |
+| --- | ---: | ---: | ---: |
+| 10 Mbps / 40 ms, GPU | 1.45 s | 0.95 s | 34% faster |
+| 1.6 Mbps / 150 ms, GPU | 7.75 s | 4.73 s | 39% faster |
+| 1.6 Mbps / 150 ms, SwiftShader | 7.93 s | 4.92 s | 38% faster |
+
+`hibiscus-detailed` moves from 25.1 s to 22.1 s on the slow profile. With SwiftShader,
+auto-rotation frames take 245 ms instead of 653 ms, a proxy for weak GPUs; the GPU
+runs are capped at 60 fps either way. On the fast profile with SwiftShader,
+`hibiscus-ready` was 0.2–0.4 s slower (4.47–4.76 s versus 4.23–4.37 s): software shader
+compilation dominates there, and the earlier core model overlaps it with texture
+streaming. These are two alternating cold runs per build of the gzip preview, in
+Playwright's Chromium with CDP throttling (Metal or SwiftShader), without CPU throttling.
+
+Fewer triangles did not always mean fewer bytes. The source meshes are regular
+grids, which Meshopt compresses very well. Halving every mesh made the core model
+10% larger, and only error-limited simplification paid off. A relative error limit
+per mesh also flattened the dew droplets, which is why dew uses a ratio instead.
+
+Against the unsimplified build, the mean per-pixel difference in the portrait, front,
+side, and macro views is 0.22–0.57 of 255, near the renderer's own run-to-run noise.
+The one visible trace is at the closest zoom: the style column's tip is slightly less
+round. Position-only simplification at the same limit showed facets on the style, a
+spike on a petal edge at grazing angles, and 2–3× the pixel difference.
+
 ## Progressive textures (September 24, 2026)
 
 The viewer now reveals a core model whose 15 petal and leaf normal maps are
@@ -76,11 +113,12 @@ The retained baseline build is `artifacts/loading-before/dist/`.
 
 - Regenerate the runtime asset from the untouched `project-files/hibiscus.glb` using
   `npm run optimize:model`: 1024-pixel maximum textures, WebP quality 80, material
-  palettes, semantic-group-aware joining, and Meshopt. No geometry simplification.
+  palettes, semantic-group-aware joining, and Meshopt. (Geometry simplification was
+  added later; see above.)
 - Joining preserves explicit `controlGroup` and `shadowCaster` metadata. The extra
   two meshes versus the earlier 19-mesh candidate retain separate foliage and
   shadow boundaries instead of merging solely by material.
-- `npm run check:model` verifies triangle totals separately for flower (438,240),
+- At the time, `npm run check:model` verified triangle totals separately for flower (438,240),
   foliage (133,216), and dew (51,840), and bounds within quantization tolerance.
 - Major petals, leaf blades, throat, and sepals cast shadows. Shadow maps update
   after foliage/wireframe changes, rather than on every camera frame.
