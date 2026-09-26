@@ -4,38 +4,42 @@
 
 The optimizer now simplifies each source mesh with meshoptimizer 1.3
 (`simplifyWithUpdate`, weighing normals and UVs, with `PreserveFolds`) until the
-error reaches 0.3% of the mesh's size. Dew droplets keep half their triangles.
-623,296 triangles become 143,690 (flower 88,315, foliage 29,457, dew 25,918).
+error reaches a share of the mesh's size: 0.3% for leaves and stems, 0.1% for petals,
+filaments, anthers, and pollen. The staminal column, style, stigma, throat, and
+receptacle keep every triangle, and dew droplets keep half. 623,296 triangles become
+240,340 (flower 184,965, foliage 29,457, dew 25,918).
 
 | Asset, gzip | Before | After | Change |
 | --- | ---: | ---: | ---: |
-| Core model (before reveal) | 1.24 MB | 0.63 MB | 49% smaller |
-| Full model | 4.61 MB | 4.01 MB | 13% smaller |
+| Core model (before reveal) | 1.24 MB | 0.77 MB | 38% smaller |
+| Full model | 4.61 MB | 4.14 MB | 10% smaller |
 
 | `hibiscus-ready` | Before | After | Change |
 | --- | ---: | ---: | ---: |
-| 10 Mbps / 40 ms, GPU | 1.45 s | 0.95 s | 34% faster |
-| 1.6 Mbps / 150 ms, GPU | 7.75 s | 4.73 s | 39% faster |
-| 1.6 Mbps / 150 ms, SwiftShader | 7.93 s | 4.92 s | 38% faster |
+| 10 Mbps / 40 ms, GPU | 1.45 s | 1.05 s | 28% faster |
+| 1.6 Mbps / 150 ms, GPU | 7.76 s | 5.39 s | 31% faster |
+| 10 Mbps / 40 ms, SwiftShader | 5.08 s | 4.75 s | 6% faster |
+| 1.6 Mbps / 150 ms, SwiftShader | 7.96 s | 5.57 s | 30% faster |
 
-`hibiscus-detailed` moves from 25.1 s to 22.1 s on the slow profile. With SwiftShader,
-auto-rotation frames take 245 ms instead of 653 ms, a proxy for weak GPUs; the GPU
-runs are capped at 60 fps either way. On the fast profile with SwiftShader,
-`hibiscus-ready` was 0.2–0.4 s slower (4.47–4.76 s versus 4.23–4.37 s): software shader
-compilation dominates there, and the earlier core model overlaps it with texture
-streaming. These are two alternating cold runs per build of the gzip preview, in
-Playwright's Chromium with CDP throttling (Metal or SwiftShader), without CPU throttling.
+`hibiscus-detailed` moves from 25.1 s to 22.7 s on the slow profile. With SwiftShader,
+auto-rotation frames take 368 ms instead of 707 ms, a proxy for weak GPUs; the GPU
+runs are capped at 60 fps either way. GPU rows are two alternating cold runs per
+build, which agreed within 0.03 s; SwiftShader rows are single runs. All used the gzip
+preview in Playwright's Chromium with CDP throttling, without CPU throttling.
 
 Fewer triangles did not always mean fewer bytes. The source meshes are regular
 grids, which Meshopt compresses very well. Halving every mesh made the core model
 10% larger, and only error-limited simplification paid off. A relative error limit
 per mesh also flattened the dew droplets, which is why dew uses a ratio instead.
 
-Against the unsimplified build, the mean per-pixel difference in the portrait, front,
-side, and macro views is 0.22–0.57 of 255, near the renderer's own run-to-run noise.
-The one visible trace is at the closest zoom: the style column's tip is slightly less
-round. Position-only simplification at the same limit showed facets on the style, a
-spike on a petal edge at grazing angles, and 2–3× the pixel difference.
+A uniform 0.3% limit (144k triangles, 0.63 MB core) matched the preset views, but at
+the closest zoom the style column's tip was less round and a curled petal edge
+changed shape. The per-part limits above fix both. Against the unsimplified build,
+the mean per-pixel difference is 0.13 (portrait) and 0.25 (front) of 255, and
+0.46–0.96 in close-ups at the minimum camera distance; two renders of the same model
+differ by up to 0.27. What remains is slightly lighter vein mottling on the petals.
+Position-only simplification showed facets on the style, a spike on a petal edge at
+grazing angles, and 2–3× the pixel difference.
 
 ## Progressive textures (September 24, 2026)
 

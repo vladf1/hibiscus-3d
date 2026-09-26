@@ -39,16 +39,18 @@ Pushes to `main` build and deploy `dist/` through GitHub Actions to GitHub Pages
 Run `npm run optimize:model` after exporting changes to `project-files/hibiscus.glb`,
 then `npm run check:model` and `npm run build`. The pipeline preserves the editable
 original and separate foliage/dew visibility groups. It simplifies each source mesh
-with meshoptimizer (623,296 triangles become about 144,000), joins compatible static
+with meshoptimizer (623,296 triangles become about 240,000), joins compatible static
 meshes, creates material palettes, resizes textures to at most 1024 pixels, encodes
 WebP at quality 80, and applies Meshopt compression. `TEXTURE_SIZE` and
 `TEXTURE_QUALITY` explicitly override the texture settings.
 
 Simplification (`scripts/simplify-mesh.mjs`) stops at an error of 0.3% of each mesh's
-size (`SIMPLIFY_ERROR`; `0` keeps every triangle). It weighs normals and UVs, moves
-the remaining vertices to fit the original surface, and preserves the folds of the
-thin double-sided petals. The dew droplets are one mesh spread over the flower, so
-they keep half their triangles instead (`DEW_RATIO`).
+size (`SIMPLIFY_ERROR`; `0` keeps every triangle). Petals (`PETAL_ERROR`), filaments,
+anthers, and pollen use a third of that. The staminal column, style, stigma, throat,
+and receptacle are seen up close and keep every triangle. It weighs normals and UVs,
+moves the remaining vertices to fit the original surface, and preserves the folds of
+the thin double-sided petals. The dew droplets are one mesh spread over the flower,
+so they keep half their triangles instead (`DEW_RATIO`).
 
 Before optimizing, `scripts/surface-details.mjs` corrects two things in the export.
 It moves each of the 180 dew droplets onto the front of its petal, with a flat base
@@ -60,8 +62,8 @@ specular for a matte finish. Both passes are deterministic and run before simpli
 
 The same run writes the progressive-loading assets. `assets/hibiscus-core.glb` keeps
 all geometry and color textures but replaces the 16 petal, leaf, and stem normal maps
-with 128-pixel previews (`PREVIEW_SIZE` overrides this). It is 0.63 MB gzipped instead
-of 4.01 MB. The viewer reveals the flower from the core model, then streams the
+with 128-pixel previews (`PREVIEW_SIZE` overrides this). It is 0.77 MB gzipped instead
+of 4.14 MB. The viewer reveals the flower from the core model, then streams the
 unchanged full-size normal maps from `assets/textures/`, petals first. It decodes them
 asynchronously and uploads within a small per-frame budget. The final render is
 identical to the full model. `npm run check:model` verifies that both models share

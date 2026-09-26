@@ -13,6 +13,7 @@ const quality = Number(process.env.TEXTURE_QUALITY || 80);
 const previewSize = Number(process.env.PREVIEW_SIZE || 128);
 const simplifyError = Number(process.env.SIMPLIFY_ERROR ?? 0.003);
 const dewRatio = Number(process.env.DEW_RATIO || 0.5);
+const petalError = Number(process.env.PETAL_ERROR ?? simplifyError / 3);
 if (process.env.KTX_EXPERIMENT && !process.argv[2]) throw new Error("KTX experiment requires an explicit output path.");
 await Promise.all([MeshoptDecoder.ready, MeshoptEncoder.ready, MeshoptSimplifier.ready]);
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
@@ -38,7 +39,12 @@ if (simplifyError > 0) {
     const mesh = node.getMesh();
     if (!mesh || done.has(mesh)) continue;
     done.add(mesh);
-    const options = node.getExtras().controlGroup === 'dew' ? {ratio: dewRatio, error: 1} : {ratio: 0, error: simplifyError};
+    // The staminal column, style tip, and throat are seen up close, so they keep every
+    // triangle; the filaments, anthers, and pollen around them keep more.
+    if (/Staminal column|Column rib|Style branch|stigma|throat|receptacle/i.test(node.getName())) continue;
+    const options = node.getExtras().controlGroup === 'dew' ? {ratio: dewRatio, error: 1}
+      : {ratio: 0, error: /Filament|anthers|pollen/i.test(node.getName()) ? simplifyError / 3
+        : /^Petal/.test(node.getName()) ? petalError : simplifyError};
     for (const primitive of mesh.listPrimitives())
       if (!simplifyMesh(document, primitive, options)) console.log(`Not simplified: ${mesh.getName()}`);
   }
